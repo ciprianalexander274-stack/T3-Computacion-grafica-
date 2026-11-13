@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Operación Extracción</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #05080c; font-family: "Courier New", monospace; color: #e8eef2; user-select: none; }
+  canvas { display: block; position: absolute; inset: 0; z-index: 0; }
+  .hidden { display: none !important; }
+
+  #hud { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+  #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); }
+  #crosshair::before, #crosshair::after { content: ""; position: absolute; background: rgba(255,255,255,.85); }
+  #crosshair::before { left: 10px; top: 0; width: 2px; height: 22px; }
+  #crosshair::after { top: 10px; left: 0; height: 2px; width: 22px; }
+  #crosshair { mask: radial-gradient(circle, transparent 3px, #000 4px); -webkit-mask: radial-gradient(circle, transparent 3px, #000 4px); }
+  #hitmarker { position: absolute; left: 50%; top: 50%; width: 30px; height: 30px; transform: translate(-50%, -50%) rotate(45deg); border: 2px solid #ff4a3a; opacity: 0; transition: opacity .25s; }
+  #hitmarker.on { opacity: 1; transition: none; }
+
+  #topbar { position: absolute; top: 14px; left: 0; right: 0; display: flex; justify-content: center; gap: 28px; font-size: 15px; text-shadow: 0 0 6px #000; }
+  #topbar span { background: rgba(0,0,0,.45); padding: 6px 12px; border: 1px solid rgba(255,255,255,.15); }
+
+  #ammoPanel { position: absolute; right: 28px; bottom: 24px; text-align: right; text-shadow: 0 0 8px #000; }
+  #wname { font-size: 18px; letter-spacing: 3px; color: #ffd54a; text-transform: uppercase; }
+  #ammo { font-size: 64px; font-weight: bold; line-height: 1; }
+  #ammo.empty { color: #ff4a3a; }
+  #ammoAll { font-size: 13px; opacity: .8; margin-top: 6px; }
+
+  #boost { position: absolute; left: 28px; bottom: 24px; font-size: 18px; color: #4ad8ff; text-shadow: 0 0 8px #000; }
+  #toast { position: absolute; left: 50%; bottom: 22%; transform: translateX(-50%); font-size: 20px; background: rgba(0,0,0,.55); padding: 8px 18px; border: 1px solid rgba(255,255,255,.25); opacity: 0; transition: opacity .3s; }
+  #toast.on { opacity: 1; }
+  #hint { position: absolute; left: 28px; top: 14px; font-size: 12px; opacity: .65; line-height: 1.5; }
+
+  .screen { position: absolute; inset: 0; z-index: 5; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; background: rgba(3,6,9,.82); }
+  .screen h1 { margin: 0 0 8px; font-size: clamp(34px, 6vw, 68px); letter-spacing: 6px; }
+  .screen h2 { margin: 0 0 18px; font-weight: normal; font-size: 18px; color: #9fb0bb; }
+  .screen p { max-width: 640px; line-height: 1.55; margin: 6px 0; font-size: 15px; }
+  .screen button { margin-top: 22px; padding: 12px 34px; font: bold 18px "Courier New", monospace; letter-spacing: 2px; color: #05080c; background: #ffd54a; border: 0; cursor: pointer; }
+  .screen button:disabled { background: #55606a; cursor: wait; }
+  .keys { display: grid; grid-template-columns: auto auto; gap: 4px 22px; text-align: left; margin-top: 14px; font-size: 14px; }
+  .keys b { color: #ffd54a; }
+  #gameover { background: rgba(60,0,0,.85); }
+  #gameover h1 { color: #ff3a2a; }
+  #victory { background: rgba(0,40,15,.85); }
+  #victory h1 { color: #4aff8a; font-size: clamp(26px, 4.5vw, 52px); }
+  .legend i { display: inline-block; width: 12px; height: 12px; margin: 0 4px -1px 10px; }
+</style>
+</head>
+<body>
+
+<div id="hud" class="hidden">
+  <div id="hint">1 / 2: cambiar arma · ESC: pausa</div>
+  <div id="topbar">
+    <span id="objective">OBJETIVO: llega a la zona de extracción</span>
+    <span id="dist">--</span>
+    <span id="zcount">Zombis: --</span>
+  </div>
+  <div id="crosshair"></div>
+  <div id="hitmarker"></div>
+  <div id="boost" class="hidden">⚡Estas volando bro</div>
+  <div id="toast"></div>
+  <div id="ammoPanel">
+    <div id="wname"></div>
+    <div id="ammo"></div>
+    <div id="ammoAll"></div>
+  </div>
+</div>
+
+<div id="overlay" class="screen">
+  <h1 id="ovTitle">OPERACIÓN EXTRACCIÓN</h1>
+  <h2 id="ovSub">Sobrevie y no gastes toda las balas y llega a la zona segura (F de Francia).</h2>
+  <p id="ovText">Volvimos a pandemia sobrevive y llega al punto seguro para lograr el objetivo ARRIBA UPN wuh wuh .</p>
+  <div class="keys">
+    <b>W A S D</b><span>Te mueves</span>
+    <b>Mouse</b><span>Mueves la camara</span>
+    <b>Clic izquierdo</b><span>Disparas </span>
+    <b>1 / 2</b><span>DEAGLE/M4A1 / Fusil</span>
+  </div>
+  <p class="legend">Cajas: <i style="background:#ffd54a"></i>munición pistola <i style="background:#ff8a3d"></i>munición fusil <i style="background:#4ad8ff"></i>velocidad</p>
+  <button id="startBtn" disabled>CARGANDO MODELOS…</button>
+</div>
+
+<div id="gameover" class="screen hidden">
+  <h1>Perdiste pe causa</h1>
+  <h2>Te chapo el zombie.</h2>
+  <p id="goStats"></p>
+  <button id="goBtn">Intentar denuevo (R)</button>
+</div>
+
+<div id="victory" class="screen hidden">
+  <h1>¡MISIÓN COMPLETADA!</h1>
+  <h2>Has llegado a la zona de extracción</h2>
+  <p id="vStats"></p>
+  <button id="vBtn">JUGAR DE NUEVO (R)</button>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module" src="main.js"></script>
+</body>
+</html>
